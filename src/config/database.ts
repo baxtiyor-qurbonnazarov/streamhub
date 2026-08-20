@@ -13,7 +13,7 @@ dotenv.config();
 export const AppDataSource = new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL,
-  synchronize: false, // Schema is already fully synchronized in Neon PostgreSQL
+  synchronize: true, // Auto-sync schema changes with PostgreSQL database
   logging: false,
   ssl: {
     rejectUnauthorized: false, // Required for Neon serverless PostgreSQL connection

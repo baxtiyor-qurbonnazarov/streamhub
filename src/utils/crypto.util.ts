@@ -66,13 +66,16 @@ export function hashLookup(value: string): string {
  */
 export function decryptUser(user: any): any {
   if (!user) return user;
-  const { password, ...userWithoutPassword } = user;
+  const { password, resetPasswordToken, resetPasswordExpires, ...userWithoutPassword } = user;
   return {
     ...userWithoutPassword,
+    email: decryptText(user.email),
     phoneNumber: decryptText(user.phoneNumber),
     name: decryptText(user.name),
     handle: decryptText(user.handle),
     bio: decryptText(user.bio),
+    hasPassword: !!password,
+    isGoogleConnected: !!user.isGoogleConnected || !!user.googleId,
   };
 }
 

@@ -2,17 +2,17 @@ import { Request, Response, NextFunction } from "express";
 import { AppError } from "./errorHandler";
 
 export const validateRegister = (req: Request, res: Response, next: NextFunction): void => {
-  const { phoneNumber, name, handle, password } = req.body;
+  const { email, name, handle, password } = req.body;
 
-  if (!phoneNumber || typeof phoneNumber !== "string" || phoneNumber.trim().length < 9) {
-    return next(new AppError("Telefon raqami noto'g'ri kiritilgan (kamida 9 ta belgi).", 400));
+  if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return next(new AppError("Yaroqli email manzilini kiriting.", 400));
   }
 
   if (!name || typeof name !== "string" || name.trim().length < 2) {
     return next(new AppError("Ismingizni kiriting (kamida 2 ta belgi).", 400));
   }
 
-  if (!handle || typeof handle !== "string" || handle.trim().length < 3) {
+  if (!handle || typeof handle !== "string" || handle.trim().length < 2) {
     return next(new AppError("Foydalanuvchi nomi (@handle) noto'g'ri kiritilgan.", 400));
   }
 
@@ -28,14 +28,15 @@ export const validateRegister = (req: Request, res: Response, next: NextFunction
 };
 
 export const validateLogin = (req: Request, res: Response, next: NextFunction): void => {
-  const { phoneNumber, password } = req.body;
+  const { identifier, email, phoneNumber, password } = req.body;
+  const loginId = identifier || email || phoneNumber;
 
-  if (!phoneNumber || typeof phoneNumber !== "string" || phoneNumber.trim().length < 9) {
-    return next(new AppError("Telefon raqamini kiriting.", 400));
+  if (!loginId || typeof loginId !== "string" || loginId.trim().length < 2) {
+    return next(new AppError("Email yoki foydalanuvchi nomini kiriting.", 400));
   }
 
   if (!password || typeof password !== "string" || password.length < 6) {
-    return next(new AppError("Parol kamida 6 ta belgidan iborat bo'lishi kerak.", 400));
+    return next(new AppError("Parolni kiriting.", 400));
   }
 
   next();
@@ -55,4 +56,3 @@ export const validateVideoUpload = (req: Request, res: Response, next: NextFunct
 
   next();
 };
-

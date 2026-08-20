@@ -35,56 +35,7 @@ export class VideoService {
     }
 
     const videos = await query.getMany();
-    const enrichedVideos = await this.enrichVideosWithMetadata(videos, userId);
-
-    // Dynamic Pexels Injection
-    try {
-      const pexelsQuery = "technology";
-      const pexelsCategory = category || "Barchasi";
-      const pexelsVideos = await pexelsService.fetchCategoryVideos(pexelsQuery, pexelsCategory, 4);
-
-      if (pexelsVideos.length > 0) {
-        const mappedPexels = pexelsVideos.map((p) => ({
-          id: `dyn_${p.pexelsId}`,
-          bunnyVideoId: `pexels_${p.pexelsId}`,
-          title: p.title,
-          description: p.description,
-          thumbnailUrl: p.thumbnailUrl,
-          videoUrl: p.videoUrl,
-          duration: p.duration,
-          views: Math.floor(Math.random() * 100000),
-          createdAt: new Date().toISOString(),
-          category: p.category,
-          tags: p.tags,
-          authorId: `dyn_author_${p.pexelsId}`,
-          author: {
-            id: `dyn_author_${p.pexelsId}`,
-            name: p.creatorName,
-            handle: p.creatorHandle,
-            avatarUrl: p.creatorAvatarUrl,
-            bio: p.creatorBio,
-            subscribersCount: Math.floor(Math.random() * 5000),
-            isFollowed: false,
-            isVerified: true
-          },
-          likesCount: Math.floor(Math.random() * 5000),
-          dislikesCount: Math.floor(Math.random() * 100),
-          isLiked: false,
-          isDisliked: false,
-          comments: []
-        }));
-
-        // Mix Pexels videos into the feed
-        mappedPexels.forEach((pVideo, idx) => {
-          const insertPos = Math.min(enrichedVideos.length, (idx + 1) * 2);
-          enrichedVideos.splice(insertPos, 0, pVideo);
-        });
-      }
-    } catch (e) {
-      console.warn("⚠️ Dynamic Pexels injection failed:", e);
-    }
-
-    return enrichedVideos;
+    return await this.enrichVideosWithMetadata(videos, userId);
   }
 
   async getSubscribedFeed(userId: string): Promise<any[]> {

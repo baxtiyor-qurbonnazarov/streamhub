@@ -8,6 +8,7 @@ const router = Router();
 
 // Feed endpoints
 router.get("/feed", optionalAuthenticateToken, videoController.getFeed);
+router.get("/search", optionalAuthenticateToken, videoController.search);
 router.get("/subscribed", authenticateToken, videoController.getSubscribedFeed);
 
 // Video operations

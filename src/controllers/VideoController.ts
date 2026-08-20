@@ -18,6 +18,21 @@ export class VideoController {
     }
   }
 
+  async search(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.userId;
+      const q = (req.query.q as string) || "";
+      const category = req.query.category as string;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const videos = await videoService.searchVideos(userId, q, category, page, limit);
+      sendSuccess(res, videos, 200);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getSubscribedFeed(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.userId!;

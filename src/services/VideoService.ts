@@ -316,47 +316,140 @@ export class VideoService {
     return decryptComment(populated!);
   }
 
+  /**
+   * Smart Multi-Factor Recommendation Engine.
+   * Ranks matching videos by category match, author match, tag overlap, views count, and likes count.
+   */
   async getRelatedVideos(
     userId: string | undefined,
     videoId: string,
+    limit: number = 15,
   ): Promise<any[]> {
-    const video = await this.videoRepository.findOne({
+    const targetVideo = await this.videoRepository.findOne({
       where: { id: videoId },
     });
-    if (!video) {
+    if (!targetVideo) {
       throw new AppError("Video topilmadi.", 404);
     }
 
-    // Similarity algorithm (same category, matching tags, excludes current video)
-    const related = await this.videoRepository
+    // Fetch candidate videos (excluding current video)
+    const candidates = await this.videoRepository
       .createQueryBuilder("video")
       .leftJoinAndSelect("video.author", "author")
       .where("video.id != :videoId", { videoId })
-      .andWhere(
-        "(video.category = :category OR video.tags LIKE ANY(ARRAY[:...tags]))",
-        {
-          category: video.category,
-          tags:
-            video.tags.length > 0
-              ? video.tags.map((t) => `%${t}%`)
-              : ["%none%"],
-        },
-      )
-      .limit(10)
+      .orderBy("video.createdAt", "DESC")
+      .take(50)
       .getMany();
 
-    // Fallback if empty
-    if (related.length === 0) {
-      const fallback = await this.videoRepository
-        .createQueryBuilder("video")
-        .leftJoinAndSelect("video.author", "author")
-        .where("video.id != :videoId", { videoId })
-        .limit(10)
-        .getMany();
-      return this.enrichVideosWithMetadata(fallback, userId);
+    if (candidates.length === 0) return [];
+
+    const enriched = await this.enrichVideosWithMetadata(candidates, userId);
+    const targetCategory = targetVideo.category.toLowerCase();
+    const targetTags = (targetVideo.tags || []).map((t) => t.toLowerCase());
+
+    // Calculate smart multi-factor similarity score for each candidate
+    const scored = enriched.map((v) => {
+      let score = 0;
+
+      // 1. Category match (+15 points)
+      if (v.category && v.category.toLowerCase() === targetCategory) {
+        score += 15;
+      }
+
+      // 2. Author match (+10 points)
+      if (v.authorId === targetVideo.authorId) {
+        score += 10;
+      }
+
+      // 3. Tag overlap (+8 points per common tag)
+      if (v.tags && Array.isArray(v.tags)) {
+        const commonTags = v.tags.filter((t: string) => targetTags.includes(t.toLowerCase()));
+        score += commonTags.length * 8;
+      }
+
+      // 4. Popularity bonus (views & likes)
+      const viewsBonus = Math.min(10, Math.log10((v.views || 0) + 1) * 3);
+      const likesBonus = Math.min(15, (v.likesCount || 0) * 1.5);
+      score += viewsBonus + likesBonus;
+
+      return { video: v, score };
+    });
+
+    // Sort by Similarity Score DESC
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored.slice(0, limit).map((s) => s.video);
+  }
+
+  /**
+   * Smart High-Performance Tokenized Search Engine.
+   * Searches title, description, category, tags, author name, and handle with multi-field relevance scoring.
+   */
+  async searchVideos(
+    userId: string | undefined,
+    queryStr: string,
+    category?: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<any[]> {
+    let query = this.videoRepository
+      .createQueryBuilder("video")
+      .leftJoinAndSelect("video.author", "author")
+      .orderBy("video.createdAt", "DESC");
+
+    if (category && category !== "Barchasi") {
+      query = query.where("video.category = :category", { category });
     }
 
-    return this.enrichVideosWithMetadata(related, userId);
+    const allVideos = await query.getMany();
+    if (allVideos.length === 0) return [];
+
+    const enriched = await this.enrichVideosWithMetadata(allVideos, userId);
+
+    if (!queryStr || queryStr.trim() === "") {
+      const offset = (page - 1) * limit;
+      return enriched.slice(offset, offset + limit);
+    }
+
+    const tokens = queryStr.trim().toLowerCase().split(/\s+/);
+
+    const scored = enriched.map((v) => {
+      let score = 0;
+      const titleLower = (v.title || "").toLowerCase();
+      const descLower = (v.description || "").toLowerCase();
+      const categoryLower = (v.category || "").toLowerCase();
+      const authorNameLower = (v.author?.name || "").toLowerCase();
+      const authorHandleLower = (v.author?.handle || "").toLowerCase();
+      const tagsLower = (v.tags || []).map((t: string) => t.toLowerCase());
+
+      for (const token of tokens) {
+        // Title match (highest weight: +10)
+        if (titleLower.includes(token)) score += 10;
+
+        // Tag match (weight: +8)
+        if (tagsLower.some((t: string) => t.includes(token))) score += 8;
+
+        // Category match (weight: +6)
+        if (categoryLower.includes(token)) score += 6;
+
+        // Author name/handle match (weight: +5)
+        if (authorNameLower.includes(token) || authorHandleLower.includes(token)) score += 5;
+
+        // Description match (weight: +3)
+        if (descLower.includes(token)) score += 3;
+      }
+
+      return { video: v, score };
+    });
+
+    // Filter out videos with 0 relevance score
+    const matches = scored.filter((s) => s.score > 0);
+
+    // Sort by relevance score DESC
+    matches.sort((a, b) => b.score - a.score);
+
+    const offset = (page - 1) * limit;
+    return matches.slice(offset, offset + limit).map((s) => s.video);
   }
 
   async incrementViews(videoId: string): Promise<number> {
